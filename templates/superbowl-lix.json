@@ -1,0 +1,131 @@
+{
+  "templateId": "superbowl-lix",
+  "name": "Super Bowl LIX",
+  "description": "Super Bowl LIX - Feb 9, 2026 - New Orleans",
+  "bets": [
+    {
+      "betId": "coin-toss",
+      "question": "Coin Toss Result?",
+      "options": [
+        "Heads",
+        "Tails"
+      ],
+      "triggerConfig": {
+        "open": [
+          "coin toss",
+          "toss the coin"
+        ],
+        "resolve": [
+          "it's heads",
+          "it's tails",
+          "heads wins",
+          "tails wins"
+        ]
+      },
+      "timerDuration": 30
+    },
+    {
+      "betId": "first-score",
+      "question": "First Score Type?",
+      "options": [
+        "Touchdown",
+        "Field Goal",
+        "Safety"
+      ],
+      "triggerConfig": {
+        "open": [
+          "kickoff",
+          "game begins"
+        ],
+        "resolve": [
+          "touchdown",
+          "field goal is good",
+          "safety"
+        ]
+      },
+      "timerDuration": 45
+    },
+    {
+      "betId": "halftime-score",
+      "question": "Halftime Score Leader?",
+      "options": [
+        "Team A Leading",
+        "Team B Leading",
+        "Tied"
+      ],
+      "triggerConfig": {
+        "open": [
+          "approaching halftime",
+          "two minute warning.*half"
+        ],
+        "resolve": [
+          "halftime",
+          "end of the half"
+        ]
+      },
+      "timerDuration": 45
+    },
+    {
+      "betId": "mvp",
+      "question": "Super Bowl MVP?",
+      "options": [
+        "TBD - Based on teams"
+      ],
+      "triggerConfig": {
+        "open": [
+          "fourth quarter",
+          "final minutes"
+        ],
+        "resolve": [
+          "mvp",
+          "most valuable player"
+        ]
+      },
+      "timerDuration": 60
+    },
+    {
+      "betId": "gatorade-color",
+      "question": "Gatorade Shower Color?",
+      "options": [
+        "Orange",
+        "Yellow/Lime",
+        "Red",
+        "Blue",
+        "Purple",
+        "Clear/Water"
+      ],
+      "triggerConfig": {
+        "open": [
+          "final minute",
+          "about to win"
+        ],
+        "resolve": [
+          "gatorade",
+          "dumped.*coach"
+        ]
+      },
+      "timerDuration": 30
+    },
+    {
+      "betId": "anthem-length",
+      "question": "National Anthem Length?",
+      "options": [
+        "Under 1:45",
+        "1:45 - 2:00",
+        "2:00 - 2:15",
+        "Over 2:15"
+      ],
+      "triggerConfig": {
+        "open": [
+          "national anthem",
+          "singer.*anthem"
+        ],
+        "resolve": [
+          "anthem.*complete",
+          "anthem.*finished"
+        ]
+      },
+      "timerDuration": 30
+    }
+  ]
+}

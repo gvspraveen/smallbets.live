@@ -1,0 +1,79 @@
+{
+  "templateId": "oscars-2026",
+  "name": "Oscars 2026",
+  "description": "98th Academy Awards - March 2026",
+  "bets": [
+    {
+      "betId": "best-picture",
+      "question": "Best Picture?",
+      "options": [
+        "TBD - Nominees announced January 2026"
+      ],
+      "triggerConfig": {
+        "open": [
+          "best picture",
+          "nominees.*best picture"
+        ],
+        "resolve": [
+          "and the oscar goes to",
+          "and the winner is"
+        ]
+      },
+      "timerDuration": 60
+    },
+    {
+      "betId": "best-director",
+      "question": "Best Director?",
+      "options": [
+        "TBD - Nominees announced January 2026"
+      ],
+      "triggerConfig": {
+        "open": [
+          "best director",
+          "directing category"
+        ],
+        "resolve": [
+          "and the oscar goes to",
+          "and the winner is"
+        ]
+      },
+      "timerDuration": 60
+    },
+    {
+      "betId": "best-actor",
+      "question": "Best Actor?",
+      "options": [
+        "TBD - Nominees announced January 2026"
+      ],
+      "triggerConfig": {
+        "open": [
+          "best actor",
+          "actor in a leading role"
+        ],
+        "resolve": [
+          "and the oscar goes to",
+          "and the winner is"
+        ]
+      },
+      "timerDuration": 60
+    },
+    {
+      "betId": "best-actress",
+      "question": "Best Actress?",
+      "options": [
+        "TBD - Nominees announced January 2026"
+      ],
+      "triggerConfig": {
+        "open": [
+          "best actress",
+          "actress in a leading role"
+        ],
+        "resolve": [
+          "and the oscar goes to",
+          "and the winner is"
+        ]
+      },
+      "timerDuration": 60
+    }
+  ]
+}

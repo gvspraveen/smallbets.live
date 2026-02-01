@@ -1,0 +1,122 @@
+{
+  "templateId": "grammys-2026",
+  "name": "Grammy Awards 2026",
+  "description": "67th Annual Grammy Awards - Feb 2, 2026",
+  "bets": [
+    {
+      "betId": "album-of-year",
+      "question": "Album of the Year?",
+      "options": [
+        "The Tortured Poets Department - Taylor Swift",
+        "Cowboy Carter - Beyoncé",
+        "Short n' Sweet - Sabrina Carpenter",
+        "Hit Me Hard and Soft - Billie Eilish",
+        "Brat - Charli XCX"
+      ],
+      "triggerConfig": {
+        "open": [
+          "album of the year",
+          "next.*category.*album",
+          "nominees.*album of the year"
+        ],
+        "resolve": [
+          "grammy goes to",
+          "and the winner is",
+          "congratulations to"
+        ]
+      },
+      "timerDuration": 60
+    },
+    {
+      "betId": "record-of-year",
+      "question": "Record of the Year?",
+      "options": [
+        "Now and Then - The Beatles",
+        "Espresso - Sabrina Carpenter",
+        "Texas Hold 'Em - Beyoncé",
+        "Not Like Us - Kendrick Lamar",
+        "Good Luck, Babe! - Chappell Roan"
+      ],
+      "triggerConfig": {
+        "open": [
+          "record of the year",
+          "next.*category.*record"
+        ],
+        "resolve": [
+          "grammy goes to",
+          "and the winner is"
+        ]
+      },
+      "timerDuration": 60
+    },
+    {
+      "betId": "song-of-year",
+      "question": "Song of the Year?",
+      "options": [
+        "Fortnight - Taylor Swift ft. Post Malone",
+        "Die With A Smile - Lady Gaga & Bruno Mars",
+        "Birds of a Feather - Billie Eilish",
+        "Please Please Please - Sabrina Carpenter",
+        "Texas Hold 'Em - Beyoncé"
+      ],
+      "triggerConfig": {
+        "open": [
+          "song of the year",
+          "next.*category.*song"
+        ],
+        "resolve": [
+          "grammy goes to",
+          "and the winner is"
+        ]
+      },
+      "timerDuration": 60
+    },
+    {
+      "betId": "best-new-artist",
+      "question": "Best New Artist?",
+      "options": [
+        "Sabrina Carpenter",
+        "Chappell Roan",
+        "Doechii",
+        "Khruangbin",
+        "Raye",
+        "Shaboozey",
+        "Teddy Swims",
+        "Benson Boone"
+      ],
+      "triggerConfig": {
+        "open": [
+          "best new artist",
+          "new artist category"
+        ],
+        "resolve": [
+          "grammy goes to",
+          "and the winner is"
+        ]
+      },
+      "timerDuration": 60
+    },
+    {
+      "betId": "best-pop-vocal-album",
+      "question": "Best Pop Vocal Album?",
+      "options": [
+        "The Tortured Poets Department - Taylor Swift",
+        "Short n' Sweet - Sabrina Carpenter",
+        "Hit Me Hard and Soft - Billie Eilish",
+        "Eternal Sunshine - Ariana Grande",
+        "143 - Katy Perry"
+      ],
+      "triggerConfig": {
+        "open": [
+          "best pop vocal album",
+          "pop album category"
+        ],
+        "resolve": [
+          "grammy goes to",
+          "and the winner is"
+        ]
+      },
+      "timerDuration": 60
+    }
+  ]
+}

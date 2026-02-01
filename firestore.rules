@@ -1,0 +1,34 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Rooms - publicly readable, but only backend can write
+    match /rooms/{roomCode} {
+      allow read: if true;
+      allow write: if false; // Backend only
+    }
+
+    // Users - readable by room participants, backend writes
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if false; // Backend only
+    }
+
+    // Bets - publicly readable, backend writes
+    match /bets/{betId} {
+      allow read: if true;
+      allow write: if false; // Backend only
+    }
+
+    // UserBets - readable by all, backend writes
+    match /userBets/{userBetId} {
+      allow read: if true;
+      allow write: if false; // Backend only
+    }
+
+    // TranscriptEntries - readable by all, backend writes
+    match /transcripts/{roomCode}/{entryId} {
+      allow read: if true;
+      allow write: if false; // Backend only
+    }
+  }
+}
