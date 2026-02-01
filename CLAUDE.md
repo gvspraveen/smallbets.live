@@ -48,38 +48,89 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for comprehensive architecture document
 
 ## File Structure
 ```
-microbets/
+smallbets.live/
 ├── SPEC.md                      # Full product specification
 ├── CLAUDE.md                    # This file
 ├── ARCHITECTURE.md              # Architecture patterns, review workflow, constraints
-├── frontend/                    # React app
+├── README.md                    # Project overview and setup
+├── frontend/                    # React + TypeScript + Vite
 │   ├── src/
-│   │   ├── components/          # React components
-│   │   │   ├── player/          # Player view (bet UI, leaderboard)
-│   │   │   ├── admin/           # Admin control panel
-│   │   │   └── shared/          # Shared UI components
-│   │   ├── hooks/               # Firebase hooks, custom hooks
-│   │   ├── services/            # Firebase service wrappers
-│   │   ├── types/               # TypeScript types
-│   │   └── utils/               # Helpers
-│   └── package.json
-├── functions/                   # Firebase Cloud Functions (Python)
-│   ├── main.py                  # HTTP endpoints (webhook, admin actions)
-│   ├── triggers.py              # Firestore triggers (bet automation)
-│   ├── game_logic.py            # Core betting logic (pure functions)
-│   ├── transcript_parser.py     # Keyword matching, winner extraction
-│   └── requirements.txt
+│   │   ├── components/pages/    # Page components (Home, CreateRoom, JoinRoom, Room)
+│   │   ├── hooks/               # React hooks (useRoom, useUser, useBet, useSession)
+│   │   ├── services/            # API client and Firestore listeners
+│   │   ├── types/               # TypeScript type definitions
+│   │   ├── config/              # Firebase configuration
+│   │   ├── App.tsx              # Main router
+│   │   ├── main.tsx             # Entry point
+│   │   └── index.css            # Global styles (mobile-first, dark theme)
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── tsconfig.json
+├── backend/                     # FastAPI + Python
+│   ├── models/                  # Pydantic models (Room, User, Bet, UserBet, etc.)
+│   ├── services/                # Firestore services (room_service, user_service, bet_service)
+│   ├── api/                     # API endpoints (planned)
+│   ├── main.py                  # FastAPI application (17 endpoints)
+│   ├── game_logic.py            # Pure functions (scoring, validation)
+│   ├── firebase_config.py       # Firebase Admin SDK initialization
+│   ├── requirements.txt
+│   ├── pyproject.toml
+│   └── Dockerfile               # Container image for Cloud Run
 ├── templates/                   # Event templates (JSON)
-│   ├── grammys-2026.json
-│   ├── oscars-2026.json
-│   └── superbowl-lix.json
-└── firebase.json                # Firebase config
+│   ├── grammys-2026.json        # Grammy Awards 2026 (5 bets)
+│   ├── oscars-2026.json         # Oscars 2026 (4 bets, nominees TBD)
+│   └── superbowl-lix.json       # Super Bowl LIX (6 bets)
+├── firebase.json                # Firebase hosting config
+├── firestore.rules              # Firestore security rules
+└── firestore.indexes.json       # Firestore composite indexes
 ```
 
+## Implementation Status
+
+### Phase 1: Core Infrastructure ✅ COMPLETED
+- [x] Project structure (frontend + backend)
+- [x] Pydantic data models with FCIS compliance (7 models, 100% pure)
+- [x] Firebase configuration and initialization
+- [x] FastAPI application (17 endpoints)
+- [x] Game logic (pure functions for scoring and validation)
+- [x] Firestore services (room, user, bet operations)
+
+### Phase 2: Player Experience ✅ COMPLETED
+- [x] React application with routing
+- [x] Firebase hooks for real-time sync
+- [x] Session management (sessionStorage)
+- [x] Home page (room code entry)
+- [x] Create room page
+- [x] Join room page
+- [x] Room page (basic UI with participants)
+- [x] Mobile-first CSS (dark theme, touch-friendly)
+
+### Phase 3: Automation Engine 🔄 IN PROGRESS
+- [ ] Transcript ingestion webhook API
+- [ ] Bet trigger engine (keyword matching)
+- [ ] Winner extraction engine (fuzzy matching)
+- [ ] Manual live feed UI
+- [ ] YouTube Live captions integration (optional)
+
+### Phase 4: Admin Controls 📋 TODO
+- [ ] Admin control panel
+- [ ] Automation monitoring dashboard
+- [ ] Manual override controls
+- [ ] Event template management
+
+### Phase 5: Templates & Testing 📋 TODO
+- [x] Grammy Awards 2026 template (with trigger config)
+- [x] Oscars 2026 + Super Bowl LIX templates
+- [ ] Scoring logic integration
+- [ ] End-to-end testing
+- [ ] Load testing (20+ concurrent users)
+- [ ] Firebase Hosting deployment
+
 ## Development Workflow
-1. Run locally: `npm run dev` (frontend), Firebase emulator (backend)
-2. Deploy: `firebase deploy`
-3. Test with multiple phones/browsers for real-time sync
+1. **Backend**: `cd backend && uv run uvicorn main:app --reload`
+2. **Frontend**: `cd frontend && npm install && npm run dev`
+3. **Firebase Emulator**: `firebase emulators:start` (optional for local Firestore)
+4. **Deploy**: `firebase deploy` (hosting + Firestore rules)
 
 ## Event Templates
 - **Oscars 2026**: Major categories (Picture, Director, Actor, Actress, etc.)
