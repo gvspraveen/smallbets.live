@@ -1,0 +1,25 @@
+/**
+ * Main App component with routing
+ */
+
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import HomePage from './components/pages/HomePage';
+import CreateRoomPage from './components/pages/CreateRoomPage';
+import JoinRoomPage from './components/pages/JoinRoomPage';
+import RoomPage from './components/pages/RoomPage';
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/create" element={<CreateRoomPage />} />
+        <Route path="/join/:code?" element={<JoinRoomPage />} />
+        <Route path="/room/:code" element={<RoomPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;
