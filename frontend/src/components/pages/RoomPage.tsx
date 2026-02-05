@@ -3,12 +3,14 @@
  */
 
 import { useParams, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from '@/hooks/useSession';
 import { useRoom } from '@/hooks/useRoom';
 import { useUser } from '@/hooks/useUser';
 import { useBet } from '@/hooks/useBet';
 import { useParticipants } from '@/hooks/useParticipants';
+import AdminPanel from '@/components/admin/AdminPanel';
+import type { Room } from '@/types';
 
 export default function RoomPage() {
   const { code } = useParams<{ code: string }>();
@@ -18,6 +20,8 @@ export default function RoomPage() {
   const { user, loading: userLoading } = useUser(session?.userId || null);
   const { bet, loading: betLoading } = useBet(room?.currentBetId || null);
   const { participants } = useParticipants(code || null);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [localRoom, setLocalRoom] = useState<Room | null>(room);
 
   // Redirect if no session
   useEffect(() => {
@@ -25,6 +29,13 @@ export default function RoomPage() {
       navigate(`/join/${code}`);
     }
   }, [session, code, navigate]);
+
+  // Update local room when Firestore room changes
+  useEffect(() => {
+    if (room) {
+      setLocalRoom(room);
+    }
+  }, [room]);
 
   if (roomLoading || userLoading) {
     return (
@@ -35,7 +46,7 @@ export default function RoomPage() {
     );
   }
 
-  if (!room || !user) {
+  if (!localRoom || !user) {
     return (
       <div className="container" style={{ paddingTop: '3rem' }}>
         <div className="card">
@@ -52,6 +63,7 @@ export default function RoomPage() {
   }
 
   const isHost = user.isAdmin;
+  const displayRoom = localRoom;
 
   return (
     <div className="container-full" style={{ paddingTop: '1rem' }}>
@@ -59,11 +71,11 @@ export default function RoomPage() {
       <div className="card mb-md">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <h3 style={{ marginBottom: '0.25rem' }}>Room {room.code}</h3>
+            <h3 style={{ marginBottom: '0.25rem' }}>Room {displayRoom.code}</h3>
             <p className="text-muted" style={{ fontSize: '0.875rem', marginBottom: 0 }}>
-              {room.status === 'waiting' && 'Waiting to start'}
-              {room.status === 'active' && 'Event in progress'}
-              {room.status === 'finished' && 'Event finished'}
+              {displayRoom.status === 'waiting' && 'Waiting to start'}
+              {displayRoom.status === 'active' && 'Event in progress'}
+              {displayRoom.status === 'finished' && 'Event finished'}
             </p>
           </div>
           <div className="text-right">
@@ -77,35 +89,46 @@ export default function RoomPage() {
         </div>
         {isHost && (
           <div className="mt-md" style={{ paddingTop: '0.75rem', borderTop: '1px solid var(--color-border)' }}>
-            <p className="text-secondary" style={{ fontSize: '0.875rem', marginBottom: 0 }}>
-              You are the host
-            </p>
+            <button
+              className="btn btn-secondary btn-full"
+              onClick={() => setShowAdminPanel(!showAdminPanel)}
+              style={{ fontSize: 'var(--font-size-sm)' }}
+            >
+              {showAdminPanel ? 'Hide Admin Panel' : 'Show Admin Panel'}
+            </button>
           </div>
         )}
       </div>
 
+      {/* Admin Panel (host only) */}
+      {isHost && showAdminPanel && session?.hostId && (
+        <div className="mb-md">
+          <AdminPanel
+            room={displayRoom}
+            hostId={session.hostId}
+            currentBet={bet}
+            onRoomUpdate={setLocalRoom}
+          />
+        </div>
+      )}
+
       {/* Main Content */}
-      {room.status === 'waiting' && (
+      {displayRoom.status === 'waiting' && (
         <div className="card mb-md text-center">
           <h4 className="mb-md">Waiting for event to start</h4>
           <p className="text-secondary mb-md">
             {participants.length} {participants.length === 1 ? 'participant' : 'participants'}
           </p>
-          {isHost && (
-            <button className="btn btn-primary">
-              Start Event
-            </button>
-          )}
         </div>
       )}
 
-      {room.status === 'active' && !bet && (
+      {displayRoom.status === 'active' && !bet && (
         <div className="card mb-md text-center">
           <p className="text-secondary">Waiting for next bet...</p>
         </div>
       )}
 
-      {room.status === 'active' && bet && (
+      {displayRoom.status === 'active' && bet && (
         <div className="card mb-md">
           <h3 className="mb-md">{bet.question}</h3>
           <p className="text-secondary mb-md" style={{ fontSize: '0.875rem' }}>
