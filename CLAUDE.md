@@ -85,53 +85,6 @@ smallbets.live/
 └── firestore.indexes.json       # Firestore composite indexes
 ```
 
-## Implementation Status
-
-### Phase 1: Core Infrastructure ✅ COMPLETED
-- [x] Project structure (frontend + backend)
-- [x] Pydantic data models with FCIS compliance (7 models, 100% pure)
-- [x] Firebase configuration and initialization
-- [x] FastAPI application (17 endpoints)
-- [x] Game logic (pure functions for scoring and validation)
-- [x] Firestore services (room, user, bet operations)
-
-### Phase 2: Player Experience ✅ COMPLETED
-- [x] React application with routing
-- [x] Firebase hooks for real-time sync
-- [x] Session management (sessionStorage)
-- [x] Home page (room code entry)
-- [x] Create room page
-- [x] Join room page
-- [x] Room page (basic UI with participants)
-- [x] Mobile-first CSS (dark theme, touch-friendly)
-
-### Phase 3: Automation Engine ✅ COMPLETED
-- [x] Transcript ingestion webhook API (POST /api/rooms/{code}/transcript)
-- [x] Bet trigger engine (keyword matching with regex + fuzzy fallback)
-- [x] Winner extraction engine (fuzzy matching with confidence scoring)
-- [x] Manual live feed UI (LiveFeedPanel + AdminPanel)
-- [ ] YouTube Live captions integration (optional - not MVP)
-
-### Phase 4: Admin Controls ✅ COMPLETED
-- [x] Admin control panel (AdminPanel component)
-- [x] Automation monitoring (live feed with result feedback)
-- [x] Manual override controls (toggle automation, manual bet controls)
-- [x] Event template management (templates created, integration pending)
-
-### Phase 5: Templates & Testing 📋 TODO
-- [x] Grammy Awards 2026 template (with trigger config)
-- [x] Oscars 2026 + Super Bowl LIX templates
-- [ ] Scoring logic integration
-- [ ] End-to-end testing
-- [ ] Load testing (20+ concurrent users)
-- [ ] Firebase Hosting deployment
-
-## Development Workflow
-1. **Backend**: `cd backend && uv run uvicorn main:app --reload`
-2. **Frontend**: `cd frontend && npm install && npm run dev`
-3. **Firebase Emulator**: `firebase emulators:start` (optional for local Firestore)
-4. **Deploy**: `firebase deploy` (hosting + Firestore rules)
-
 ## Event Templates
 - **Oscars 2026**: Major categories (Picture, Director, Actor, Actress, etc.)
 - **Super Bowl LIX**: Pre-game, in-game, fun bets (Gatorade color, anthem length, etc.)
@@ -150,3 +103,23 @@ smallbets.live/
 - Chat functionality
 - Push notifications
 - Real money (requires major compliance work)
+
+## Workflow Orchestration
+
+### 1. Plan Mode Default
+- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+- If something goes sideways, STOP and re-plan immediately - don't keep pushing
+- Use plan mode for verification steps, not just building
+- Write detailed specs upfront to reduce ambiguity
+
+### 2. Subagent Strategy
+- Use subagents liberally to keep main context window clean
+- Offload research, exploration, and parallel analysis to subagents
+- For complex problems, throw more compute at it via subagents
+- One tack per subagent for focused execution
+
+### 3. Self-Improvement Loop
+- After ANY correction from the user: update `tasks/lessons.md` with the pattern
+- Write rules for yourself that prevent the same mistake
+- Ruthlessly iterate on these lessons until mistake rate drops
+- Review lessons at session start for relevant project
