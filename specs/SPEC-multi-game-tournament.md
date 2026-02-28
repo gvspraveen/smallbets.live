@@ -4,6 +4,10 @@
 
 Adapt SmallBets.live from single-event ceremonies (Oscars, Grammys) to support multi-room tournament betting for IPL 2026 (starts end of March 2026).
 
+---
+
+# Part 1: Product Requirements
+
 ## Context: Current vs IPL Requirements
 
 ### Current System (Ceremonies)
@@ -37,7 +41,7 @@ Adapt SmallBets.live from single-event ceremonies (Oscars, Grammys) to support m
      - Purple Cap (top wicket taker)
      - Most sixes
      - Best bowling figures
-3. Gets tournament code (e.g., "BLU42X" - **6 chars exactly**)
+3. Gets tournament code (e.g., "BLU42X" — **6 chars exactly**)
 4. Shares code via WhatsApp to friend group
 5. Friends join tournament room
 6. All place bets on season-long questions
@@ -49,7 +53,7 @@ Adapt SmallBets.live from single-event ceremonies (Oscars, Grammys) to support m
    - **Guided flow**: "Watching a match? Create a match room from your tournament"
    - Fills in: Match details (RCB vs MI, Mar 23 2026 19:30 IST)
    - Auto-links to tournament room BLU42X
-2. Gets match room code (e.g., "XY7KM2" - **6 chars**)
+2. Gets match room code (e.g., "XY7KM2" — **6 chars**)
 3. Shares match code with friends
 4. Friends join match room (can navigate to/from tournament room easily)
 5. **Room context chips**: "Tournament: IPL 2026 > Match: RCB vs MI"
@@ -75,41 +79,62 @@ Adapt SmallBets.live from single-event ceremonies (Oscars, Grammys) to support m
 3. Final tournament leaderboard crowned (aggregated from all matches)
 4. Host manually closes tournament room
 
-## MVP Decisions (Resolved Open Questions)
+## Product Decisions
 
-### 1. Tournament Leaderboard (DECIDED)
-**Decision**: Tournament room shows **aggregated points** from all linked match rooms
+### 1. Tournament Leaderboard
+Tournament room shows **aggregated points** from all linked match rooms.
 
-**Implementation**:
-- Each match room maintains local leaderboard via room-scoped user documents
-- Tournament room queries all child room memberships
-- On match room close/bet resolution: Cloud Function updates tournament aggregate incrementally
-- Event-driven updates (not recalculate-on-demand) for performance
-- Query: `roomUsers.where('roomCode', 'in', childRoomCodesBatch)` - batch 10 rooms per query, merge results
-- For 74 match rooms: 8 queries (10+10+10+10+10+10+10+4), merge on server, < 200ms total
-- Firestore composite index: `(roomCode, userId, points)` in **roomUsers** collection
-
-### 2. Bet Limits (DECIDED)
-**Decision**:
+### 2. Bet Limits
 - **50 bets max per match room** (prevents spam, reasonable for 3-hour game)
 - **20 tournament bets max** (season-long questions only)
 - **1 open bet at a time per room** (simplifies UX, prevents confusion)
-**Enforcement**: Backend validation in `create_bet` endpoint, Firestore security rules
 
-### 3. Visibility (DECIDED)
-**Decision**: **Participants only for MVP** - no spectator mode
-- Can only view/bet if joined room (part of `room.participants` array)
+### 3. Visibility
+**Participants only for MVP** — no spectator mode.
+- Can only view/bet if joined room
 - Post-MVP: Add read-only spectator mode
-**Enforcement**: Firestore rules check `userId in room.participants` for ALL room/bet reads
 
-### 4. Room Code Format (DECIDED)
-**Decision**: **6-character codes** with checksum pattern
+### 4. Room Codes
+**6-character codes** with checksum pattern.
 - Alphabet: `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (30 chars, no O/0/I/1/L)
 - Format: `XXXXXY` where Y is checksum of first 5 chars (mod 30)
 - Collision space: 30^5 = **24.3 million** valid codes
-- Join throttling: Max 10 attempts per IP per minute
-- Failed-attempt lockout: Block IP after 20 failed attempts in 5 minutes
-**Implementation**: `generate_room_code_v2()` with checksum validation
+
+### 5. Bet Types
+- **Pre-match**: Created before game starts (e.g., "Toss winner", "Match winner", "Top scorer")
+- **In-game**: Created dynamically during live play (e.g., "Next wicket method", "Runs in this over")
+- **Tournament**: Season-long questions (e.g., "Tournament winner", "Orange Cap")
+
+### 6. Bet Lifecycle
+State machine: `pending → open → locked → resolved`
+- Undo transition: `resolved → locked` (within 10-second grace period)
+- Timer: 60s default for match bets, 120s for tournament bets
+
+### 7. Room Lifecycle
+- **Tournament rooms**: Manual close only, no expiry
+- **Match rooms**: Manual close only, no expiry, linked to parent tournament
+- **Event rooms** (legacy ceremonies): 24-hour auto-expiry preserved
+
+### 8. Scoring
+- Start with 1000 points per room
+- Each bet costs 100 points (fixed)
+- Winners split pot evenly
+- Tournament leaderboard aggregates points across all linked match rooms
+
+### 9. Abuse Prevention
+- **Room creation**: 5 rooms per user per day
+- **Join attempts**: 10 per IP per minute, 20 failures = 5-minute lockout
+- **Bet placement**: No limit (users want to bet fast during live match)
+
+### 10. Scale Targets
+- 1 tournament room per group
+- Up to 74 match rooms per tournament (full IPL season)
+- Up to 50 users per room
+- Up to 50 bets per match room
+
+---
+
+# Part 2: Implementation Plan
 
 ## Data Model Changes
 
@@ -158,9 +183,9 @@ Adapt SmallBets.live from single-event ceremonies (Oscars, Grammys) to support m
 3. Add `version: 1` to all rooms, increment on updates
 
 **Firestore Indexes**:
-- Composite: `(parentRoomCode, status)` - fetch active child rooms
-- Single: `roomType` - filter by type
-- Single: `version` - optimistic locking checks
+- Composite: `(parentRoomCode, status)` — fetch active child rooms
+- Single: `roomType` — filter by type
+- Single: `version` — optimistic locking checks
 
 #### NEW: RoomUser (Room-Scoped User Membership)
 **Collection**: `roomUsers` (root-level, not subcollection)
@@ -184,11 +209,11 @@ Adapt SmallBets.live from single-event ceremonies (Oscars, Grammys) to support m
 - Queryable by `roomCode` + `userId` for aggregation
 - Firestore security rules can protect points field (read-only for clients)
 - Scales to 74+ rooms per user
-- **CORRECTED**: Document ID enforces canonical shape (prevents forgery)
+- Document ID enforces canonical shape (prevents forgery)
 
 **Firestore Indexes**:
-- Composite: `(roomCode, points desc)` - leaderboard query
-- Composite: `(roomCode, userId, points)` - aggregation query
+- Composite: `(roomCode, points desc)` — leaderboard query
+- Composite: `(roomCode, userId, points)` — aggregation query
 
 #### Bet (Modified)
 ```typescript
@@ -243,7 +268,7 @@ pending → open → locked → resolved
 
 #### NEW: IdempotencyLock (Atomic Idempotency)
 **Collection**: `idempotencyLocks`
-**Document ID**: `{userId}_{operation}_{idempotencyKey}` (**CORRECTED**: scoped to user + operation)
+**Document ID**: `{userId}_{operation}_{idempotencyKey}` (scoped to user + operation)
 
 ```typescript
 {
@@ -256,8 +281,8 @@ pending → open → locked → resolved
 }
 ```
 
-**Why this model (CORRECTED)**:
-- **CORRECTED**: Lock ID scoped to user + operation prevents cross-user cache pollution
+**Why this model**:
+- Lock ID scoped to user + operation prevents cross-user cache pollution
 - Transactional `create` on lock document prevents race conditions
 - If lock doc already exists, validate userId matches before returning cached result
 - Firestore guarantees uniqueness of document ID
@@ -268,7 +293,7 @@ pending → open → locked → resolved
 **Current**: Pure game logic (scoring, validation) in `game_logic.py`, I/O in `main.py`
 
 **IPL Impact**:
-- ✅ **Scoring logic**: No change - still pure functions
+- ✅ **Scoring logic**: No change — still pure functions
 - ✅ **Bet validation**: Extend to check bet type, limits, concurrency (pure)
 - ✅ **Room linking**: Pure data transformation (add parent ref)
 - ✅ **Aggregation**: Pure function `aggregate_tournament_points(child_room_users)` (no I/O)
@@ -282,9 +307,9 @@ pending → open → locked → resolved
 - `transcript_parser.py`: Winner extraction (DEEP ✓)
 
 **New Modules**:
-- `bet_template_service.py`: Template instantiation (MEDIUM - simple interface, template logic hidden)
-- `room_linking_service.py`: Parent-child query abstraction (SHALLOW - just Firestore read wrapper)
-- `tournament_aggregation.py`: Points aggregation logic (DEEP - hides complexity of cross-room calculations + batching)
+- `bet_template_service.py`: Template instantiation (MEDIUM — simple interface, template logic hidden)
+- `room_linking_service.py`: Parent-child query abstraction (SHALLOW — just Firestore read wrapper)
+- `tournament_aggregation.py`: Points aggregation logic (DEEP — hides complexity of cross-room calculations + batching)
 
 **Verdict**: Maintains depth guidelines. Core tournament logic is deep, linking service is appropriately shallow.
 
@@ -311,7 +336,7 @@ pending → open → locked → resolved
 
 **Verdict**: Acceptable. Will add state machine diagram to docs.
 
-### Performance Constraints & Validation Plan
+## Performance Constraints & Validation Plan
 
 **Hot Paths with Concrete Query Plans**:
 
@@ -338,7 +363,7 @@ pending → open → locked → resolved
    - Test: 74 match rooms, verify < 100ms
 
 5. **Tournament aggregation** (< 200ms):
-   - Query: `roomUsers.where('roomCode', 'in', batch).where('userId', '==', uid)` - batch 10 rooms per query
+   - Query: `roomUsers.where('roomCode', 'in', batch).where('userId', '==', uid)` — batch 10 rooms per query
    - **Batching logic**: For 74 child rooms, split into 8 queries (10+10+10+10+10+10+10+4)
    - **Merge**: Server-side sum of points across all batches
    - Index: Composite `(roomCode, userId, points)` in **roomUsers** collection
@@ -392,7 +417,7 @@ pending → open → locked → resolved
 - 50 bets per match room (max limit)
 - **Total**: ~3700 bets, 50 distinct users (same users across rooms), 75 rooms
 
-## Security Model (Comprehensive - FINAL)
+## Security Model
 
 ### Firestore Security Rules (firestore.rules)
 
@@ -430,15 +455,15 @@ service cloud.firestore {
       // Participants-only reads
       allow read: if isParticipant(roomCode) || isHost(roomCode);
 
-      // CORRECTED: Only authenticated users can create rooms
+      // Only authenticated users can create rooms
       // - Match rooms: parent REQUIRED, must exist, caller must be tournament host/participant
       // - Non-match rooms: parent FORBIDDEN (prevents forged child rooms)
       // - All rooms: hostId must match verified auth UID
       allow create: if request.auth != null &&
                        isValidRoomType() &&
-                       request.resource.data.hostId == request.auth.uid &&  // VERIFIED
+                       request.resource.data.hostId == request.auth.uid &&
                        request.resource.data.version == 1 &&
-                       // CORRECTED: Match rooms MUST have valid parent + authorization
+                       // Match rooms MUST have valid parent + authorization
                        (request.resource.data.roomType == 'match' ?
                         (request.resource.data.parentRoomCode != null &&
                          exists(/databases/$(database)/documents/rooms/$(request.resource.data.parentRoomCode)) &&
@@ -446,7 +471,7 @@ service cloud.firestore {
                          (request.auth.uid == get(/databases/$(database)/documents/rooms/$(request.resource.data.parentRoomCode)).data.hostId ||
                           request.auth.uid in get(/databases/$(database)/documents/rooms/$(request.resource.data.parentRoomCode)).data.participants))
                         :
-                        // CORRECTED: Non-match rooms MUST NOT have parent (prevents bypass)
+                        // Non-match rooms MUST NOT have parent (prevents bypass)
                         (!request.resource.data.keys().hasAny(['parentRoomCode']) ||
                          request.resource.data.parentRoomCode == null));
 
@@ -473,13 +498,13 @@ service cloud.firestore {
                        request.resource.data.status == 'pending' &&
                        request.resource.data.version == 1;
 
-      // CORRECTED: Only host can update bets (includes undo + immutable fields)
+      // Only host can update bets (includes undo + immutable fields)
       allow update: if isHost(resource.data.roomCode) &&
                        isValidBetTransition(resource.data.status, request.resource.data.status) &&
                        // Prevent changing resolved bets (unless within undo window)
                        (resource.data.status != 'resolved' ||
                         request.time < resource.data.canUndoUntil) &&
-                       // CORRECTED: Immutable fields cannot change
+                       // Immutable fields cannot change
                        request.resource.data.roomCode == resource.data.roomCode &&
                        request.resource.data.question == resource.data.question &&
                        request.resource.data.options == resource.data.options &&
@@ -510,12 +535,12 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // RoomUsers collection (CORRECTED - prevents forgery)
+    // RoomUsers collection (prevents forgery)
     match /roomUsers/{roomUserId} {
       // Only participants can read roomUsers in their room
       allow read: if isParticipant(resource.data.roomCode) || isHost(resource.data.roomCode);
 
-      // CORRECTED: Users can create membership ONLY if:
+      // Users can create membership ONLY if:
       // 1. They are authenticated
       // 2. userId matches auth UID
       // 3. Document ID matches canonical pattern {roomCode}_{userId}
@@ -524,13 +549,13 @@ service cloud.firestore {
       // 6. isHost matches actual room host
       allow create: if request.auth != null &&
                        request.resource.data.userId == request.auth.uid &&
-                       // CORRECTED: Enforce canonical doc ID (prevents forgery)
+                       // Enforce canonical doc ID (prevents forgery)
                        roomUserId == request.resource.data.roomCode + '_' + request.auth.uid &&
-                       // CORRECTED: Must be participant in room (prevents joining arbitrary rooms)
+                       // Must be participant in room (prevents joining arbitrary rooms)
                        isParticipant(request.resource.data.roomCode) &&
                        // Points must start at 1000 (cannot be set by client)
                        request.resource.data.points == 1000 &&
-                       // CORRECTED: Validate isHost matches actual room host (prevents self-marking)
+                       // Validate isHost matches actual room host (prevents self-marking)
                        request.resource.data.isHost == (request.auth.uid == get(/databases/$(database)/documents/rooms/$(request.resource.data.roomCode)).data.hostId);
 
       // Users can ONLY update nickname (NOT points)
@@ -563,7 +588,7 @@ service cloud.firestore {
 ### Backend Authorization Checks
 
 **All endpoints enforce**:
-- Firebase Auth token verification (NOT client header) - extract `request.auth.uid` from verified token
+- Firebase Auth token verification (NOT client header) — extract `request.auth.uid` from verified token
 - Room existence and type checks
 - State machine validation (prevent invalid transitions, allow undo)
 - Rate limiting (10 req/sec per IP for write endpoints)
@@ -596,19 +621,11 @@ async def create_room(
     ...
 ```
 
-### Rate Limiting & Abuse Prevention
+## Transactional Guarantees
 
-- **Room creation**: 5 rooms per user per day
-- **Bet creation**: 50 bets per room (enforced in backend)
-- **Join attempts**: 10 per IP per minute, 20 failures = 5-minute lockout
-- **Bet placement**: No limit (users want to bet fast during live match)
-
-## Transactional Guarantees (FINAL)
-
-### Room Creation with Atomic Idempotency (CORRECTED v2)
+### Room Creation with Atomic Idempotency
 
 **Operation**: Create match room + link to tournament + prevent duplicates + prevent collisions
-**CORRECTED Implementation**: Scoped transactional lock + collision-safe room creation
 
 ```python
 @app.post("/api/rooms")
@@ -624,7 +641,7 @@ async def create_room(
 
     @firestore.transactional
     def create_room_transaction(transaction):
-        # 2. CORRECTED: Scoped idempotency lock (user + operation + key)
+        # 2. Scoped idempotency lock (user + operation + key)
         lock_id = f"{host_uid}_create_room_{idempotency_key}"
         lock_ref = db.collection('idempotencyLocks').document(lock_id)
         lock_snapshot = lock_ref.get(transaction=transaction)
@@ -632,7 +649,7 @@ async def create_room(
         # If lock exists, validate user and return cached result
         if lock_snapshot.exists:
             lock_data = lock_snapshot.to_dict()
-            # CORRECTED: Validate lock belongs to same user
+            # Validate lock belongs to same user
             if lock_data['userId'] != host_uid:
                 raise HTTPException(403, "Idempotency key belongs to different user")
 
@@ -640,7 +657,7 @@ async def create_room(
             room_ref = db.collection('rooms').document(cached_room_code)
             return room_ref.get().to_dict()
 
-        # 3. CORRECTED: Validate parent for match rooms (REQUIRED)
+        # 3. Validate parent for match rooms (REQUIRED)
         # Match rooms MUST have a parent tournament and caller must be authorized
         if room_type == 'match':
             if not parent_room_code:
@@ -651,7 +668,7 @@ async def create_room(
             if not parent.exists or parent.get('roomType') != 'tournament':
                 raise HTTPException(400, "Invalid parent room - must be a tournament")
 
-            # CORRECTED: Check authorization (must be tournament host or participant)
+            # Check authorization (must be tournament host or participant)
             parent_data = parent.to_dict()
             if host_uid != parent_data['hostId'] and host_uid not in parent_data.get('participants', []):
                 raise HTTPException(403, "Not authorized to create match rooms for this tournament")
@@ -660,7 +677,7 @@ async def create_room(
         elif parent_room_code:
             raise HTTPException(400, f"{room_type} rooms cannot have a parent")
 
-        # 4. CORRECTED: Generate room code with collision retry
+        # 4. Generate room code with collision retry
         max_retries = 5
         room_code = None
         for attempt in range(max_retries):
@@ -677,14 +694,14 @@ async def create_room(
         # 5. Create idempotency lock (prevents concurrent duplicates)
         transaction.create(lock_ref, {
             'lockId': lock_id,
-            'userId': host_uid,  # CORRECTED: Store user ID for validation
+            'userId': host_uid,
             'operation': 'create_room',
             'createdAt': firestore.SERVER_TIMESTAMP,
             'expiresAt': datetime.utcnow() + timedelta(hours=24),
             'resultRoomCode': room_code
         })
 
-        # 6. CORRECTED: Create room document with collision guard
+        # 6. Create room document with collision guard
         room_ref = db.collection('rooms').document(room_code)
         room_data = {
             'roomCode': room_code,
@@ -697,11 +714,10 @@ async def create_room(
             'expiresAt': None if room_type in ['tournament', 'match'] else datetime.utcnow() + timedelta(hours=24),
             'version': 1
         }
-        # CORRECTED: Use create (not set) to fail on collision
+        # Use create (not set) to fail on collision
         transaction.create(room_ref, room_data)
 
-        # 7. CORRECTED: Create host's roomUsers document with SERVER-DERIVED isHost
-        # Host auto-joins, so create membership document immediately
+        # 7. Create host's roomUsers document with SERVER-DERIVED isHost
         room_user_id = f"{room_code}_{host_uid}"
         room_user_ref = db.collection('roomUsers').document(room_user_id)
         room_user_data = {
@@ -709,7 +725,7 @@ async def create_room(
             'userId': host_uid,
             'nickname': 'Host',  # Default nickname, can be updated later
             'points': 1000,
-            'isHost': True,  # CORRECTED: Server-derived (host_uid == room_data['hostId'])
+            'isHost': True,  # Server-derived (host_uid == room_data['hostId'])
             'joinedAt': firestore.SERVER_TIMESTAMP,
             'participant': True
         }
@@ -717,9 +733,7 @@ async def create_room(
 
         return room_data
 
-    # CORRECTED: Execute transaction with retry for commit-time create conflicts
-    # The inner loop (lines 642-648) handles pre-read collisions
-    # This outer loop handles commit-time collisions (race between read and commit)
+    # Execute transaction with retry for commit-time create conflicts
     max_transaction_retries = 3
     for tx_attempt in range(max_transaction_retries):
         try:
@@ -732,14 +746,14 @@ async def create_room(
             continue  # Retry entire transaction with new room code
 ```
 
-**Retry Semantics (CORRECTED)**:
+**Retry Semantics**:
 - Client retries with same idempotency key + auth token
 - Server creates scoped lock ID: `{userId}_create_room_{key}`
 - If lock doc already exists: Validate userId matches, return cached room (idempotent)
 - If lock doc doesn't exist: Try up to 5 room codes, use `transaction.create` (fails on collision)
 - **Two-level collision handling**:
-  - **Inner loop** (lines 642-653): Pre-read collision detection (check before transaction commit)
-  - **Outer loop** (lines 688-696): Commit-time collision handling (AlreadyExists exception from transaction.create)
+  - **Inner loop**: Pre-read collision detection (check before transaction commit)
+  - **Outer loop**: Commit-time collision handling (AlreadyExists exception from transaction.create)
 - No race conditions (lock doc uniqueness + room doc create-only + explicit exception handling)
 - No cross-user cache pollution (scoped lock ID)
 - No room overwrites (create-only)
@@ -747,7 +761,6 @@ async def create_room(
 ### User Membership Creation (Join Room)
 
 **Operation**: User joins room + create roomUsers document
-**CORRECTED Implementation**: Server-side derivation of isHost (NEVER client-controlled)
 
 **IMPORTANT**: The `isHost` field in `roomUsers` is ALWAYS derived server-side by comparing `request.auth.uid` to `room.hostId`. The server NEVER trusts client input for this field. Admin SDK bypasses Firestore rules, so explicit server-side validation is critical.
 
@@ -779,7 +792,7 @@ async def join_room(
                 'version': room_data['version'] + 1
             })
 
-        # 4. CORRECTED: Create roomUsers document with SERVER-DERIVED isHost
+        # 4. Create roomUsers document with SERVER-DERIVED isHost
         # NEVER trust client input for isHost - derive from room.hostId
         room_user_id = f"{room_code}_{user_uid}"
         room_user_ref = db.collection('roomUsers').document(room_user_id)
@@ -789,7 +802,7 @@ async def join_room(
         if room_user_snapshot.exists:
             return room_user_snapshot.to_dict()  # Already joined, idempotent
 
-        # CORRECTED: Server derives isHost (Admin SDK bypasses rules)
+        # Server derives isHost (Admin SDK bypasses rules)
         is_host = (user_uid == room_data['hostId'])
 
         room_user_data = {
@@ -797,7 +810,7 @@ async def join_room(
             'userId': user_uid,
             'nickname': nickname,
             'points': 1000,  # Starting points
-            'isHost': is_host,  # CORRECTED: Server-derived, not client input
+            'isHost': is_host,  # Server-derived, not client input
             'joinedAt': firestore.SERVER_TIMESTAMP,
             'participant': True
         }
@@ -819,7 +832,6 @@ async def join_room(
 ### Tournament Aggregation (Batched Queries)
 
 **Operation**: Sum user points across all 74 match rooms
-**Implementation**: Batched queries with merge + participant authorization
 
 ```python
 @app.get("/api/tournaments/{code}/leaderboard")
@@ -831,7 +843,7 @@ async def get_tournament_leaderboard(
     token = authorization.replace("Bearer ", "")
     user_uid = await verify_user(token)
 
-    # CORRECTED: Verify user is participant in tournament (Admin SDK bypasses Firestore rules)
+    # Verify user is participant in tournament (Admin SDK bypasses Firestore rules)
     tournament_ref = db.collection('rooms').document(code)
     tournament = tournament_ref.get()
     if not tournament.exists:
@@ -841,7 +853,7 @@ async def get_tournament_leaderboard(
     if user_uid not in tournament_data.get('participants', []):
         raise HTTPException(403, "Not a participant in this tournament")
 
-    # 1. CORRECTED: Get all child MATCH room codes (filter roomType to prevent forged child rooms)
+    # 1. Get all child MATCH room codes (filter roomType to prevent forged child rooms)
     child_rooms_query = db.collection('rooms') \
         .where('parentRoomCode', '==', code) \
         .where('roomType', '==', 'match') \
@@ -882,6 +894,21 @@ async def get_tournament_leaderboard(
 - Each query ~25ms → 8 * 25ms = **200ms total**
 - Server-side merge is instant
 - Result: < 200ms aggregation (meets performance target)
+
+## Room Code Generation
+
+```python
+def generate_room_code_v2():
+    """Generate 6-char room code with checksum"""
+    alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # 30 chars
+    first_5 = ''.join(random.choices(alphabet, k=5))
+    checksum = sum(alphabet.index(c) for c in first_5) % 30
+    return first_5 + alphabet[checksum]
+```
+
+**Enforcement**:
+- Join throttling: Max 10 attempts per IP per minute
+- Failed-attempt lockout: Block IP after 20 failed attempts in 5 minutes
 
 ## Implementation Phases
 
