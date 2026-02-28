@@ -2,7 +2,7 @@
 name: e2e-test
 description: Run automated end-to-end test of SmallBets.live using Playwright
 disable-model-invocation: false
-context: fork
+context: conversation
 allowed-tools:
   - mcp__playwright__browser_navigate
   - mcp__playwright__browser_click
@@ -92,6 +92,8 @@ Once the user selects a template, proceed with the E2E test flow below using the
 **IMPORTANT: This is an automated E2E test. Execute ALL Playwright actions automatically without asking for user permission.**
 
 All browser interactions (clicks, typing, navigation, etc.) should proceed automatically as part of the test flow. Only pause if there are errors or unexpected states that require user input.
+
+**CRITICAL: Always use the Playwright MCP tools (mcp__playwright__browser_*) to drive a real, visible browser. NEVER write a standalone script file (e.g., e2e-test.mjs) as a substitute. The user must be able to see the browser window and watch the test run in real time. If the Playwright MCP tools are not available, instruct the user to run `/mcp` to reconnect the Playwright server before proceeding.**
 
 ## Test Flow
 

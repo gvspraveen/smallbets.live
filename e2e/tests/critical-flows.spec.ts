@@ -143,7 +143,7 @@ async function createBetViaAdmin(
   await page.click('button:has-text("Create Bet")');
 
   // Wait for success indicator
-  await expect(page.locator('text=Bet created successfully')).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('text=Bet created successfully!')).toBeVisible({ timeout: 10_000 });
 }
 
 /**
@@ -235,7 +235,7 @@ test.describe('Complete Betting Flow', () => {
       // Verify host is in the room and sees "Waiting to start"
       await expect(hostPage.locator('text=Waiting to start')).toBeVisible();
       await expect(hostPage.locator('text=HostPlayer')).toBeVisible();
-      await expect(hostPage.locator('text=1000')).toBeVisible();
+      await expect(hostPage.locator('p').filter({ hasText: /^1000$/ })).toBeVisible();
 
       // Step 2: Guest joins the room
       await joinRoomViaUI(guestPage, roomCode, 'GuestPlayer');
