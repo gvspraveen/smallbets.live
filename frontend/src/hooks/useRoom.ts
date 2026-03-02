@@ -5,7 +5,9 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { subscribeToRoom } from '@/services/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/config/firebase';
+import { subscribeToRoom, parseRoomDoc } from '@/services/firestore';
 import type { Room } from '@/types';
 
 export function useRoom(roomCode: string | null) {
@@ -26,9 +28,11 @@ export function useRoom(roomCode: string | null) {
     hasReceivedData.current = false;
 
     let graceTimeout: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
 
     // Subscribe to room updates (I/O)
     const unsubscribe = subscribeToRoom(roomCode, (updatedRoom) => {
+      if (cancelled) return;
       if (updatedRoom) {
         hasReceivedData.current = true;
         if (graceTimeout) {
@@ -44,13 +48,29 @@ export function useRoom(roomCode: string | null) {
       } else {
         // First snapshot returned null — room may not have synced yet
         // (e.g., navigating right after room creation).
-        // Wait a short grace period before showing "not found".
+        // Wait a grace period, then verify via one-time Firestore read
+        // before showing "not found".
         if (!graceTimeout) {
-          graceTimeout = setTimeout(() => {
-            if (!hasReceivedData.current) {
-              setRoom(null);
-              setLoading(false);
+          graceTimeout = setTimeout(async () => {
+            if (cancelled || hasReceivedData.current) {
+              graceTimeout = null;
+              return;
             }
+            // One-time read to definitively check if room exists
+            try {
+              const snapshot = await getDoc(doc(db, 'rooms', roomCode));
+              if (cancelled || hasReceivedData.current) return;
+              if (snapshot.exists()) {
+                hasReceivedData.current = true;
+                setRoom(parseRoomDoc(snapshot.data()));
+              } else {
+                setRoom(null);
+              }
+            } catch {
+              if (cancelled || hasReceivedData.current) return;
+              setRoom(null);
+            }
+            setLoading(false);
             graceTimeout = null;
           }, 2000);
         }
@@ -59,6 +79,7 @@ export function useRoom(roomCode: string | null) {
 
     // Cleanup listener on unmount
     return () => {
+      cancelled = true;
       unsubscribe();
       if (graceTimeout) {
         clearTimeout(graceTimeout);

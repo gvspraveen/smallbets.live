@@ -30,6 +30,28 @@ function timestampToDate(timestamp: any): Date {
 }
 
 /**
+ * Parse Firestore room document data into a Room object
+ */
+export function parseRoomDoc(data: Record<string, any>): Room {
+  return {
+    code: data.code,
+    eventTemplate: data.eventTemplate,
+    eventName: data.eventName ?? null,
+    status: data.status,
+    hostId: data.hostId,
+    automationEnabled: data.automationEnabled ?? true,
+    createdAt: timestampToDate(data.createdAt),
+    expiresAt: data.expiresAt ? timestampToDate(data.expiresAt) : null,
+    roomType: data.roomType ?? 'event',
+    parentRoomCode: data.parentRoomCode ?? null,
+    participants: data.participants ?? [],
+    matchDetails: data.matchDetails ?? null,
+    currentBetId: data.currentBetId ?? null,
+    version: data.version ?? 1,
+  };
+}
+
+/**
  * Subscribe to room updates
  */
 export function subscribeToRoom(
@@ -44,25 +66,7 @@ export function subscribeToRoom(
       return;
     }
 
-    const data = snapshot.data();
-    const room: Room = {
-      code: data.code,
-      eventTemplate: data.eventTemplate,
-      eventName: data.eventName ?? null,
-      status: data.status,
-      hostId: data.hostId,
-      automationEnabled: data.automationEnabled ?? true,
-      createdAt: timestampToDate(data.createdAt),
-      expiresAt: data.expiresAt ? timestampToDate(data.expiresAt) : null,
-      roomType: data.roomType ?? 'event',
-      parentRoomCode: data.parentRoomCode ?? null,
-      participants: data.participants ?? [],
-      matchDetails: data.matchDetails ?? null,
-      currentBetId: data.currentBetId ?? null,
-      version: data.version ?? 1,
-    };
-
-    callback(room);
+    callback(parseRoomDoc(snapshot.data()));
   });
 }
 
@@ -260,6 +264,24 @@ export function subscribeToUserBets(
     });
 
     callback(userBets);
+  });
+}
+
+/**
+ * Subscribe to match rooms for a tournament (real-time)
+ */
+export function subscribeToMatchRooms(
+  parentRoomCode: string,
+  callback: (rooms: Room[]) => void
+): Unsubscribe {
+  const matchRoomsQuery = query(
+    collection(db, 'rooms'),
+    where('parentRoomCode', '==', parentRoomCode)
+  );
+
+  return onSnapshot(matchRoomsQuery, (snapshot) => {
+    const rooms: Room[] = snapshot.docs.map((d) => parseRoomDoc(d.data()));
+    callback(rooms);
   });
 }
 

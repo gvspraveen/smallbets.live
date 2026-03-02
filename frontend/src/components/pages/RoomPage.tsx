@@ -13,7 +13,8 @@ import { useUserBets } from '@/hooks/useUserBets';
 import { useParticipants } from '@/hooks/useParticipants';
 import AdminPanel from '@/components/admin/AdminPanel';
 import { betApi, roomApi } from '@/services/api';
-import type { Room, Bet, UserBet } from '@/types';
+import { subscribeToMatchRooms } from '@/services/firestore';
+import type { Room, Bet, UserBet, LeaderboardEntry } from '@/types';
 
 // Map template IDs to friendly names
 const EVENT_TEMPLATE_NAMES: Record<string, string> = {
@@ -27,7 +28,7 @@ const EVENT_TEMPLATE_NAMES: Record<string, string> = {
 export default function RoomPage() {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
-  const { session } = useSession();
+  const { session, switchToRoom } = useSession();
   const { room, loading: roomLoading } = useRoom(code || null);
   const { user, loading: userLoading } = useUser(session?.userId || null);
   const { bets, loading: betsLoading } = useBets(code || null);
@@ -39,6 +40,7 @@ export default function RoomPage() {
   const [placingBets, setPlacingBets] = useState<Set<string>>(new Set());
   const [betErrors, setBetErrors] = useState<Record<string, string>>({});
   const [matchRooms, setMatchRooms] = useState<Room[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
 
   // Match room creation state
   const [showCreateMatch, setShowCreateMatch] = useState(false);
@@ -48,17 +50,21 @@ export default function RoomPage() {
 
   // Redirect if no session for this room
   useEffect(() => {
-    if (!session || session.roomCode !== code) {
-      // Pass current session as context so identity is preserved
-      // when navigating between tournament and match rooms
-      navigate(`/join/${code}`, {
-        state: session ? {
-          parentUserId: session.userId,
-          nickname: session.nickname,
-        } : undefined,
-      });
-    }
-  }, [session, code, navigate]);
+    if (!code) return;
+    if (session && session.roomCode === code) return;
+
+    // Check if we have a saved session for this room (e.g., returning
+    // from a match room to the tournament room via breadcrumb)
+    if (code && switchToRoom(code)) return;
+
+    // No session for this room, redirect to join
+    navigate(`/join/${code}`, {
+      state: session ? {
+        parentUserId: session.userId,
+        nickname: session.nickname,
+      } : undefined,
+    });
+  }, [session, code, navigate, switchToRoom]);
 
   // Update local room when Firestore room changes
   useEffect(() => {
@@ -67,13 +73,33 @@ export default function RoomPage() {
     }
   }, [room]);
 
-  // Load match rooms for tournaments
+  // Real-time match rooms listener for tournaments
   useEffect(() => {
-    if (localRoom?.roomType === 'tournament') {
-      roomApi.getMatchRooms(localRoom.code)
-        .then(res => setMatchRooms(res.matches))
-        .catch(() => {});
+    if (localRoom?.roomType !== 'tournament' || !localRoom?.code) {
+      setMatchRooms([]);
+      return;
     }
+
+    const unsubscribe = subscribeToMatchRooms(localRoom.code, (rooms) => {
+      setMatchRooms(rooms);
+    });
+
+    return () => unsubscribe();
+  }, [localRoom?.roomType, localRoom?.code]);
+
+  // Fetch aggregated leaderboard for tournaments (polls every 10s)
+  useEffect(() => {
+    if (localRoom?.roomType !== 'tournament' || !localRoom?.code) return;
+
+    const fetchLeaderboard = () => {
+      roomApi.getLeaderboard(localRoom.code)
+        .then(res => setLeaderboard(res.leaderboard))
+        .catch(() => {});
+    };
+
+    fetchLeaderboard();
+    const interval = setInterval(fetchLeaderboard, 10000);
+    return () => clearInterval(interval);
   }, [localRoom?.roomType, localRoom?.code]);
 
   const toggleBetExpanded = (betId: string) => {
@@ -552,11 +578,26 @@ export default function RoomPage() {
         </div>
       )}
 
-      {/* Participants List */}
+      {/* Participants List / Tournament Leaderboard */}
       <div className="card">
-        <h4 className="mb-md">Participants ({participants.length})</h4>
+        <h4 className="mb-md">
+          {isTournament ? 'Leaderboard' : 'Participants'} ({isTournament && leaderboard.length > 0 ? leaderboard.length : participants.length})
+        </h4>
         <div style={{ display: 'grid', gap: '0.5rem' }}>
-          {participants
+          {(isTournament && leaderboard.length > 0
+            ? leaderboard.map(l => ({
+                userId: l.userId,
+                nickname: l.nickname,
+                points: l.points,
+                isAdmin: l.isHost ?? l.isAdmin ?? false,
+              }))
+            : participants.map(p => ({
+                userId: p.userId,
+                nickname: p.nickname,
+                points: p.points,
+                isAdmin: p.isAdmin,
+              }))
+          )
             .sort((a, b) => b.points - a.points)
             .map((participant, index) => (
               <div
